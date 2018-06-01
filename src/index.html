@@ -5,12 +5,36 @@
     <title>Centered Eve Map</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.13.0/d3.min.js"
             integrity="sha256-hYXbQJK4qdJiAeDVjjQ9G0D6A0xLnDQ4eJI9dkm7Fpk=" crossorigin="anonymous"></script>
-
     <style>
-
+        #cy {
+            width: 100%;
+            height: calc(100% - 100px);
+            position: absolute;
+            top: 100px;
+            left: 0px;
+            border: 1px solid black;
+        }
     </style>
 </head>
 <body>
 
+<div id="input-form" class="container">
+    <div class="row">
+        <div class="form-inline">
+            <div class="form-group" id="system-group">
+                <label for="system">System</label>
+                <input type="text" class="form-control" id="system" value="Tama">
+                <span id="system-help-text" class="help-block"></span>
+            </div>
+            <div class="form-group" id="depth-group">
+                <label for="depth">Depth</label>
+                <input type="text" class="form-control" id="depth" value="4">
+                <span id="depth-help-text" class="help-block"></span>
+            </div>
+            <button type="submit" class="btn btn-default" id="draw-network">Show Systems</button>
+        </div>
+    </div>
+</div>
+<div id="cy"></div>
 </body>
 </html>

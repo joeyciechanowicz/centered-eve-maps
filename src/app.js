@@ -1,35 +1,13 @@
-import {
-  drag,
-  event,
-  forceCenter,
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  scaleOrdinal,
-  select
-} from 'd3';
-
+import './bootstrap.min.css';
 import uni from './translated-universe';
 
-// Our lookups in the universe
-const NAME = 0;
-const SECURITY = 1;
-const EDGES = 2;
+import cytoscape from 'cytoscape';
+import coseBilkent from 'cytoscape-cose-bilkent';
+import cola from 'cytoscape-cola';
+import {EDGES, NAME, REGION, SECURITY} from './constants';
 
-const width = window.innerWidth;
-const height = window.innerHeight;
-const sizeDivisor = 100, nodePadding = 2.5;
-
-const svg = select('body')
-  .append('svg')
-  .attr('width', width)
-  .attr('height', height);
-
-const simulation = forceSimulation()
-  .force('link', forceLink().id(d => d.name))
-  .force('charge', forceManyBody())
-  .force('center', forceCenter(width / 2, height / 2));
+cytoscape.use(cola);
+cytoscape.use(coseBilkent);
 
 const nameLookup = uni.reduce((lookup, x, idx) => {
   lookup[x[0]] = idx;
@@ -37,10 +15,6 @@ const nameLookup = uni.reduce((lookup, x, idx) => {
 }, {});
 
 function getNeighbourhoodGraph(system, depth) {
-  if (!nameLookup[system]) {
-    throw new Error(`Unknown system ${system}`);
-  }
-
   const nodeIndexesAdded = {
     [nameLookup[system]]: true
   };
@@ -59,6 +33,7 @@ function getNeighbourhoodGraph(system, depth) {
   }
 
   const edgesAdded = {};
+  const regionsAdded = {};
   const edges = [];
   const vertices = [];
 
@@ -66,24 +41,36 @@ function getNeighbourhoodGraph(system, depth) {
     const sourceNode = uni[sourceNodeIndex];
 
     const vertex = {
-      name: sourceNode[NAME],
-      security: sourceNode[SECURITY],
-      group: 1
+      data: {
+        id: sourceNode[NAME],
+        name: sourceNode[NAME],
+        security: sourceNode[SECURITY],
+        parent: sourceNode[REGION],
+      },
+      classes: 'child'
     };
 
-    if (vertex.name === system) {
-      vertex.fx = height / 2;
-      vertex.fy = height / 2;
-    }
-
     vertices.push(vertex);
+
+    if (!regionsAdded[vertex[REGION]]) {
+      const regionVertex = {
+        data: {
+          id: sourceNode[REGION],
+          name: sourceNode[REGION]
+        }
+      };
+      vertices.push(regionVertex);
+      regionsAdded[sourceNode[REGION]] = true;
+    }
 
     uni[sourceNodeIndex][EDGES].forEach(targetNodeIndex => {
       if (nodeIndexesAdded[targetNodeIndex] && !edgesAdded[`${sourceNodeIndex}:${targetNodeIndex}`]) {
         edges.push({
-          source: sourceNode[NAME],
-          target: uni[targetNodeIndex][NAME],
-          value: 5
+          data: {
+            id: sourceNode[NAME] + uni[targetNodeIndex][NAME],
+            source: sourceNode[NAME],
+            target: uni[targetNodeIndex][NAME]
+          }
         });
         edgesAdded[`${sourceNodeIndex}:${targetNodeIndex}`] = true;
       }
@@ -96,67 +83,102 @@ function getNeighbourhoodGraph(system, depth) {
   };
 }
 
-const color = scaleOrdinal([
-  '#2FEFEF', '#48F0C0', '#00EF47', '#00F000', '#8FEF2F', '#EFEF00', '#D77700', '#F06000',
-  '#F04800', '#D73000', '#F00000'
-]);
+const stop = () => {
+  document.getElementById('draw-network').classList.remove('disabled');
+};
 
-const padding = 2;
+const coseBilkentLayout = {
+  name: 'cose-bilkent',
+  nodeDimensionsIncludeLabels: false,
+  refresh: 30,
+  fit: true,
+  padding: 10,
+  randomize: false,
+  animate: 'during',
+  stop
+};
+
+const colaLayout = {
+  name: 'cola',
+  refresh: 30,
+  stop
+};
 
 function drawNetwork(system, depth) {
   const graph = getNeighbourhoodGraph(system, depth);
 
-  const node = svg.append('g')
-    .attr('class', 'node')
-    .selectAll('rect')
-    .data(graph.vertices)
-    .enter().append('rect')
-    .attr('width', function(d) { return d.name.length + 2 * padding; })
-    .attr('height', 10)
-    .attr('fill', function(d) { return color(d.security); })
-    .attr('x', function(d){ return d.x; })
-    .attr('y', function(d){ return d.y; });
+  const elements = graph.vertices.concat(graph.edges);
 
-  const link = svg.append('g')
-    .attr('class', 'links')
-    .selectAll('line')
-    .data(graph.edges)
-    .enter().append('line');
+  const cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements,
+    style: [
+      {
+        selector: ':parent',
+        style: {
+          label: 'data(name)',
+          'text-valign': 'top',
+          padding: '10px'
+        }
+      },
+      {
+        selector: '.child',
+        style: {
+          shape: 'roundrectangle',
+          width: 'label',
+          height: 'label',
+          'border-width': '2px',
+          'border-style': 'solid',
+          'border-color': 'mapData(security, -1.0, 1.0, red, green)',
+          'background-color': 'mapData(security, -1.0, 1.0, #ea9999, #b6d7a8)',
+          content: 'data(name)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          padding: '4px',
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': 3,
+          'line-color': '#ccc'
+        }
+      }
+    ],
+    layout: coseBilkentLayout
+  });
 
-  simulation
-    .nodes(graph.vertices)
-    .force('collide', forceCollide()
-      .strength(.5)
-      .radius((d) => d.name.length + nodePadding)
-      .iterations(1)
-    )
-    .on('tick', ticked);
+  cy.getElementById(system).style('border-width', '6px');
+}
 
-  simulation.force('link')
-    .links(graph.edges);
 
-  function ticked() {
-    link
-      .attr("x1", function(d) { return d.source.x; })
-      .attr("y1", function(d) { return d.source.y; })
-      .attr("x2", function(d) { return d.target.x; })
-      .attr("y2", function(d) { return d.target.y; });
+document.getElementById('draw-network').addEventListener('click', function (event) {
+  event.srcElement.classList.add('disabled');
+  const systemGroup = document.getElementById('system-group');
+  const depthGroup = document.getElementById('depth-group');
+  const systemHelpText = document.getElementById('system-help-text');
+  const depthHelpText = document.getElementById('depth-help-text');
 
-    node
-      .attr("cx", function(d) { return d.x; })
-      .attr("cy", function(d) { return d.y; });
+  systemGroup.classList.remove('has-error');
+  depthGroup.classList.remove('has-error');
+  systemHelpText.innerText = '';
+  depthHelpText.innerText = '';
+
+  const system = document.getElementById('system').value;
+  if (!nameLookup[system]) {
+    systemHelpText.innerText = `Unknown system ${system}`;
+    systemGroup.classList.add('has-error');
+    return;
   }
-}
 
-function drawEdge(d) {
-  context.moveTo(d.source.x, d.source.y);
-  context.lineTo(d.target.x, d.target.y);
-}
+  const depth = parseInt(document.getElementById('depth').value);
+  if (isNaN(depth)) {
+    depthGroup.classList.add('has-error');
+    depthHelpText.innerText = 'Invalid number';
+    return;
+  }
 
-function drawVertex(d) {
-  context.moveTo(d.x + 15, d.y);
-  context.arc(d.x, d.y, 15, 0, 2 * Math.PI);
-}
+  drawNetwork(system, depth);
+});
 
-
-drawNetwork('Mahtista', 3);
+drawNetwork('Tama', 4);
