@@ -106,7 +106,7 @@ const styles = [
   }
 ];
 
-export function drawNetwork(graph, startSystem, nodeSelected, nodeAltSelected) {
+export function drawNetwork(graph, markedSystems, nodeSelected, nodeAltSelected) {
   const elements = graph.vertices.concat(graph.edges);
 
   const cy = cytoscape({
@@ -116,7 +116,9 @@ export function drawNetwork(graph, startSystem, nodeSelected, nodeAltSelected) {
     layout: coseBilkentLayout
   });
 
-  cy.getElementById(startSystem).style('border-width', '6px');
+  markedSystems.forEach(system => {
+    cy.getElementById(system).style('border-width', '6px');
+  });
 
   cy.$('.child').on('tap', (e) => {
     nodeSelected(e.target.data('name'));

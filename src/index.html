@@ -46,7 +46,7 @@
 
                 <p id="system-group">
                     <label for="system">System</label>
-                    <input type="text" class="form-control" id="system" value="Tama">
+                    <input type="text" class="form-control" id="system" value="Asakai">
                     <small class="form-text text-muted">The system you want to base your map around</small>
                     <span id="system-help-text" class="help-block"></span>
                 </p>
@@ -68,6 +68,15 @@
                         Large values will hurt your computer
                     </small>
                     <span id="depth-help-text" class="help-block"></span>
+                </p>
+
+                <p id="include-group">
+                    <label for="include">include</label>
+                    <input type="text" class="form-control" id="include" placeholder="e.g. Tama, Amarr">
+                    <small class="form-text text-muted">Comma separated list of systems to include in the map, that
+                        may fall outside the depth given.
+                    </small>
+                    <span id="include-help-text" class="help-block"></span>
                 </p>
 
                 <p>

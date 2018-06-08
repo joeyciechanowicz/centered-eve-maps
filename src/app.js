@@ -8,7 +8,82 @@ const nameLookup = uni.nodes.reduce((lookup, x, idx) => {
   return lookup;
 }, {});
 
-function getNeighbourhoodGraph(system, ignore, depth) {
+function PriorityQueue() {
+  this._nodes = [];
+
+  this.enqueue = function (priority, key) {
+    this._nodes.push({key: key, priority: priority});
+    this.sort();
+  };
+  this.dequeue = function () {
+    return this._nodes.shift().key;
+  };
+  this.sort = function () {
+    this._nodes.sort(function (a, b) {
+      return a.priority - b.priority;
+    });
+  };
+  this.isEmpty = function () {
+    return !this._nodes.length;
+  };
+}
+
+const INFINITY = 1 / 0;
+
+function shortestPath(startNodeIndex, finishNodeIndex) {
+  const nodes = new PriorityQueue(),
+    distances = {},
+    previous = {};
+  let path = [];
+  let smallest;
+
+  for (let vertexIndex = 0; vertexIndex < uni.nodes.length; vertexIndex++) {
+    if (vertexIndex === startNodeIndex) {
+      distances[vertexIndex] = 0;
+      nodes.enqueue(0, vertexIndex);
+    }
+    else {
+      distances[vertexIndex] = INFINITY;
+      nodes.enqueue(INFINITY, vertexIndex);
+    }
+
+    previous[vertexIndex] = null;
+  }
+
+  while (!nodes.isEmpty()) {
+    smallest = nodes.dequeue();
+
+    if (smallest === finishNodeIndex) {
+      path = [];
+
+      while (previous[smallest]) {
+        path.push(smallest);
+        smallest = previous[smallest];
+      }
+
+      break;
+    }
+
+    if (!smallest || distances[smallest] === INFINITY) {
+      continue;
+    }
+
+    uni.nodes[smallest][EDGES].forEach(neighbor => {
+      const alt = distances[smallest] + 1;
+
+      if (alt < distances[neighbor]) {
+        distances[neighbor] = alt;
+        previous[neighbor] = smallest;
+
+        nodes.enqueue(alt, neighbor);
+      }
+    });
+  }
+
+  return path;
+}
+
+function getNeighbourhoodGraph(system, ignore, depth, include) {
   const nodeIndexesAdded = {
     [nameLookup[system]]: true
   };
@@ -36,6 +111,13 @@ function getNeighbourhoodGraph(system, ignore, depth) {
   const regionsAdded = {};
   const edges = [];
   const vertices = [];
+
+  // Calculate shortest path to all the systems given
+  include.filter(includeSystem => !nodeIndexesAdded[nameLookup[includeSystem]])
+    .map(includeSystem => shortestPath(nameLookup[system], nameLookup[includeSystem]))
+    .forEach(path => {
+      path.forEach(nodeIndex => nodeIndexesAdded[nodeIndex] = true);
+    });
 
   Object.keys(nodeIndexesAdded).forEach(sourceNodeIndex => {
     const sourceNode = uni.nodes[sourceNodeIndex];
@@ -119,16 +201,22 @@ function run() {
   const systemGroup = document.getElementById('system-group');
   const depthGroup = document.getElementById('depth-group');
   const ignoreGroup = document.getElementById('ignore-group');
+  const includeGroup = document.getElementById('include-group');
+
   const systemHelpText = document.getElementById('system-help-text');
   const depthHelpText = document.getElementById('depth-help-text');
   const ignoreHelpText = document.getElementById('ignore-help-text');
+  const includeHelpText = document.getElementById('include-help-text');
 
   systemGroup.classList.remove('has-error');
   depthGroup.classList.remove('has-error');
   ignoreGroup.classList.remove('has-error');
+  includeGroup.classList.remove('has-error');
+
   systemHelpText.innerText = '';
   depthHelpText.innerText = '';
   ignoreHelpText.innerText = '';
+  includeHelpText.innerText = '';
 
   const system = document.getElementById('system').value;
   if (!nameLookup[system]) {
@@ -154,10 +242,20 @@ function run() {
     return;
   }
 
-  const graph = getNeighbourhoodGraph(system, ignore, depth);
-  drawNetwork(graph, system, nodeSelected, nodeAltSelected);
+  const include = document.getElementById('include').value
+    .split(',')
+    .map(x => x.trim())
+    .filter(x => x !== '');
+  if (include.some(x => !nameLookup[x])) {
+    includeGroup.classList.add('has-error');
+    includeHelpText.innerText = 'Unknown system';
+    return;
+  }
+
+  const graph = getNeighbourhoodGraph(system, ignore, depth, include);
+  drawNetwork(graph, [system].concat(include), nodeSelected, nodeAltSelected);
 }
 
 document.getElementById('draw-network').addEventListener('click', run);
 
-
+run();
