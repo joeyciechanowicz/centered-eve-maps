@@ -3,9 +3,20 @@ const {EDGES, NAME, REGION, SECURITY} = require('./src/constants');
 
 const fs = require('fs');
 const universe = require('./universe_pretty');
+const wormholeRegex = /J\d\d\d\d\d\d/;
 
 const nodeNameToIndex = {};
 const arrayOfNodes = [];
+
+const regions = [];
+const regionLookup = {};
+
+Object.values(universe.nodes).forEach(x => {
+  if (!regionLookup[x.region]) {
+    regionLookup[x.region] = regions.length;
+    regions.push(x.region);
+  }
+});
 
 
 /* Nodes are in the form
@@ -22,10 +33,16 @@ const arrayOfNodes = [];
 Object.keys(universe.nodes).forEach((curr, idx) => {
   nodeNameToIndex[curr] = idx;
   const node = universe.nodes[curr];
+
+  if (wormholeRegex.test(node.name)) {
+    console.log(`Skipping ${node.name}`);
+    return;
+  }
+
   arrayOfNodes.push({
     name: node.name,
     security: Math.round(node.security * 10) / 10,
-    region: node.region,
+    region: regionLookup[node.region],
     edges: []
   });
 });
@@ -68,4 +85,7 @@ const nodes = arrayOfNodes.map(x => {
   return node;
 });
 
-fs.writeFileSync('./translated-universe.json', JSON.stringify(nodes));
+fs.writeFileSync('./translated-universe.json', JSON.stringify({
+  nodes,
+  regions
+}));

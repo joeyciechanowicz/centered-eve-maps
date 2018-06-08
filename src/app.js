@@ -1,25 +1,25 @@
 import './bootstrap.min.css';
 import uni from './translated-universe';
-
-import cytoscape from 'cytoscape';
-import coseBilkent from 'cytoscape-cose-bilkent';
-import cola from 'cytoscape-cola';
 import {EDGES, NAME, REGION, SECURITY} from './constants';
+import {drawNetwork} from './graph-display';
 
-cytoscape.use(cola);
-cytoscape.use(coseBilkent);
-
-const nameLookup = uni.reduce((lookup, x, idx) => {
+const nameLookup = uni.nodes.reduce((lookup, x, idx) => {
   lookup[x[0]] = idx;
   return lookup;
 }, {});
 
-function getNeighbourhoodGraph(system, depth) {
+function getNeighbourhoodGraph(system, ignore, depth) {
   const nodeIndexesAdded = {
     [nameLookup[system]]: true
   };
 
-  let nodesToCheck = uni[nameLookup[system]][EDGES];
+  const ignoreLookup = ignore.reduce((map, x) => {
+    map[nameLookup[x]] = true;
+    return map;
+  }, {});
+
+  let nodesToCheck = uni.nodes[nameLookup[system]][EDGES]
+    .filter(node => !ignoreLookup[node]);
 
   for (let i = 0; i < depth; i++) {
     nodesToCheck = nodesToCheck.map(nodeIndex => {
@@ -28,7 +28,7 @@ function getNeighbourhoodGraph(system, depth) {
       }
 
       nodeIndexesAdded[nodeIndex] = true;
-      return uni[nodeIndex][EDGES];
+      return uni.nodes[nodeIndex][EDGES].filter(node => !ignoreLookup[node]);
     }).reduce((prev, curr) => prev.concat(curr), []);
   }
 
@@ -38,14 +38,14 @@ function getNeighbourhoodGraph(system, depth) {
   const vertices = [];
 
   Object.keys(nodeIndexesAdded).forEach(sourceNodeIndex => {
-    const sourceNode = uni[sourceNodeIndex];
+    const sourceNode = uni.nodes[sourceNodeIndex];
 
     const vertex = {
       data: {
         id: sourceNode[NAME],
         name: sourceNode[NAME],
         security: sourceNode[SECURITY],
-        parent: sourceNode[REGION],
+        parent: 'p' + sourceNode[REGION],
       },
       classes: 'child'
     };
@@ -55,21 +55,21 @@ function getNeighbourhoodGraph(system, depth) {
     if (!regionsAdded[vertex[REGION]]) {
       const regionVertex = {
         data: {
-          id: sourceNode[REGION],
-          name: sourceNode[REGION]
+          id: 'p' + sourceNode[REGION],
+          name: uni.regions[sourceNode[REGION]]
         }
       };
       vertices.push(regionVertex);
       regionsAdded[sourceNode[REGION]] = true;
     }
 
-    uni[sourceNodeIndex][EDGES].forEach(targetNodeIndex => {
+    uni.nodes[sourceNodeIndex][EDGES].forEach(targetNodeIndex => {
       if (nodeIndexesAdded[targetNodeIndex] && !edgesAdded[`${sourceNodeIndex}:${targetNodeIndex}`]) {
         edges.push({
           data: {
-            id: sourceNode[NAME] + uni[targetNodeIndex][NAME],
+            id: sourceNode[NAME] + uni.nodes[targetNodeIndex][NAME],
             source: sourceNode[NAME],
-            target: uni[targetNodeIndex][NAME]
+            target: uni.nodes[targetNodeIndex][NAME]
           }
         });
         edgesAdded[`${sourceNodeIndex}:${targetNodeIndex}`] = true;
@@ -83,91 +83,67 @@ function getNeighbourhoodGraph(system, depth) {
   };
 }
 
-const stop = () => {
-  document.getElementById('draw-network').classList.remove('disabled');
-};
-
-const coseBilkentLayout = {
-  name: 'cose-bilkent',
-  nodeDimensionsIncludeLabels: false,
-  refresh: 30,
-  fit: true,
-  padding: 10,
-  randomize: false,
-  animate: 'during',
-  stop
-};
-
-const colaLayout = {
-  name: 'cola',
-  refresh: 30,
-  stop
-};
-
-function drawNetwork(system, depth) {
-  const graph = getNeighbourhoodGraph(system, depth);
-
-  const elements = graph.vertices.concat(graph.edges);
-
-  const cy = cytoscape({
-    container: document.getElementById('cy'),
-    elements,
-    style: [
-      {
-        selector: ':parent',
-        style: {
-          label: 'data(name)',
-          'text-valign': 'top',
-          padding: '10px'
-        }
-      },
-      {
-        selector: '.child',
-        style: {
-          shape: 'roundrectangle',
-          width: 'label',
-          height: 'label',
-          'border-width': '2px',
-          'border-style': 'solid',
-          'border-color': 'mapData(security, -1.0, 1.0, red, green)',
-          'background-color': 'mapData(security, -1.0, 1.0, #ea9999, #b6d7a8)',
-          content: 'data(name)',
-          'text-valign': 'center',
-          'text-halign': 'center',
-          padding: '4px',
-        }
-      },
-      {
-        selector: 'edge',
-        style: {
-          'width': 3,
-          'line-color': '#ccc'
-        }
-      }
-    ],
-    layout: coseBilkentLayout
-  });
-
-  cy.getElementById(system).style('border-width', '6px');
+function nodeSelected(nodeName) {
+  const element = document.getElementById('system');
+  element.value = nodeName;
+  element.classList.remove('flash');
+  setTimeout(() => {
+    element.classList.add('flash');
+  }, 1);
 }
 
+function nodeAltSelected(nodeName) {
+  const element = document.getElementById('ignore');
 
-document.getElementById('draw-network').addEventListener('click', function (event) {
-  event.srcElement.classList.add('disabled');
+  if (element.value.indexOf(nodeName) !== -1) {
+    return;
+  }
+
+  if (element.value.length === 0) {
+    element.value = nodeName;
+  } else {
+    element.value += `, ${nodeName}`;
+  }
+
+  element.classList.remove('flash');
+  setTimeout(() => {
+    element.classList.add('flash');
+  }, 30);
+}
+
+function run() {
+  const button = document.getElementById('draw-network');
+  if (button.classList.contains('disabled')) return;
+
+  button.classList.add('disabled');
   const systemGroup = document.getElementById('system-group');
   const depthGroup = document.getElementById('depth-group');
+  const ignoreGroup = document.getElementById('ignore-group');
   const systemHelpText = document.getElementById('system-help-text');
   const depthHelpText = document.getElementById('depth-help-text');
+  const ignoreHelpText = document.getElementById('ignore-help-text');
 
   systemGroup.classList.remove('has-error');
   depthGroup.classList.remove('has-error');
+  ignoreGroup.classList.remove('has-error');
   systemHelpText.innerText = '';
   depthHelpText.innerText = '';
+  ignoreHelpText.innerText = '';
 
   const system = document.getElementById('system').value;
   if (!nameLookup[system]) {
     systemHelpText.innerText = `Unknown system ${system}`;
     systemGroup.classList.add('has-error');
+    return;
+  }
+
+  const ignore = document.getElementById('ignore').value
+    .split(',')
+    .map(x => x.trim())
+    .filter(x => x !== '');
+  if (ignore.some(x => !nameLookup[x])) {
+    ignoreGroup.classList.add('has-error');
+    ignoreHelpText.innerText = 'Unknown system';
     return;
   }
 
@@ -178,7 +154,10 @@ document.getElementById('draw-network').addEventListener('click', function (even
     return;
   }
 
-  drawNetwork(system, depth);
-});
+  const graph = getNeighbourhoodGraph(system, ignore, depth);
+  drawNetwork(graph, system, nodeSelected, nodeAltSelected);
+}
 
-drawNetwork('Tama', 4);
+document.getElementById('draw-network').addEventListener('click', run);
+
+
