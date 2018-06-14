@@ -1,37 +1,9 @@
 import cytoscape from 'cytoscape';
 import coseBilkent from 'cytoscape-cose-bilkent';
-import cola from 'cytoscape-cola';
-
-cytoscape.use(cola);
+import {colors, lighterColors} from './constants';
 cytoscape.use(coseBilkent);
 
-const colors = {
-  1.0: '#2FEFEF',
-  0.9: '#48F0C0',
-  0.8: '#00EF47',
-  0.7: '#00F000',
-  0.6: '#8FEF2F',
-  0.5: '#EFEF00',
-  0.4: '#D77700',
-  0.3: '#F06000',
-  0.2: '#F04800',
-  0.1: '#D73000',
-  0.0: '#F00000'
-};
 
-const lighterColors = {
-  1.0: '#7AC9B0',
-  0.9: '#95FFFF',
-  0.8: '#7FFFC6',
-  0.7: '#99FF99',
-  0.6: '#F5FF95',
-  0.5: '#FFFF66',
-  0.4: '#FFDD66',
-  0.3: '#FFC666',
-  0.2: '#FFAE66',
-  0.1: '#FF9666',
-  0.0: '#FF6666'
-};
 
 function mapSecurityColor(ele) {
   const security = ele.data('security');
@@ -105,26 +77,31 @@ const styles = [
     }
   }
 ];
+export class GraphRenderer {
+  constructor() {
 
-export function drawNetwork(graph, markedSystems, nodeSelected, nodeAltSelected) {
-  const elements = graph.vertices.concat(graph.edges);
+  }
 
-  const cy = cytoscape({
-    container: document.getElementById('cy'),
-    elements,
-    style: styles,
-    layout: coseBilkentLayout
-  });
+	drawNetwork(graph, markedSystems, nodeSelected, nodeAltSelected) {
+		const elements = graph.vertices.concat(graph.edges);
 
-  markedSystems.forEach(system => {
-    cy.getElementById(system).style('border-width', '6px');
-  });
+		const cy = cytoscape({
+			container: document.getElementById('cy'),
+			elements,
+			style: styles,
+			layout: coseBilkentLayout
+		});
 
-  cy.$('.child').on('tap', (e) => {
-    nodeSelected(e.target.data('name'));
-  });
+		markedSystems.forEach(system => {
+			cy.getElementById(system).style('border-width', '6px');
+		});
 
-  cy.$('.child').on('cxttap', (e) => {
-    nodeAltSelected(e.target.data('name'));
-  });
+		cy.$('.child').on('tap', (e) => {
+			nodeSelected(e.target.data('name'));
+		});
+
+		cy.$('.child').on('cxttap', (e) => {
+			nodeAltSelected(e.target.data('name'));
+		});
+	}
 }

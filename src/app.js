@@ -1,7 +1,7 @@
 import './bootstrap.min.css';
 import uni from './translated-universe';
 import {EDGES, NAME, REGION, SECURITY} from './constants';
-import {drawNetwork} from './graph-display';
+import {drawNetwork} from './graph-renderer';
 
 const nameLookup = uni.nodes.reduce((lookup, x, idx) => {
   lookup[x[0]] = idx;
@@ -197,7 +197,6 @@ function run() {
   const button = document.getElementById('draw-network');
   if (button.classList.contains('disabled')) return;
 
-  button.classList.add('disabled');
   const systemGroup = document.getElementById('system-group');
   const depthGroup = document.getElementById('depth-group');
   const ignoreGroup = document.getElementById('ignore-group');
@@ -242,6 +241,11 @@ function run() {
     return;
   }
 
+  if (depth > 10 && !confirm(`Are you sure you want to use a depth of ${depth}? It will use a lot of CPU while it does this.`)) {
+
+    return;
+  }
+
   const include = document.getElementById('include').value
     .split(',')
     .map(x => x.trim())
@@ -252,10 +256,10 @@ function run() {
     return;
   }
 
+  button.classList.add('disabled');
+
   const graph = getNeighbourhoodGraph(system, ignore, depth, include);
   drawNetwork(graph, [system].concat(include), nodeSelected, nodeAltSelected);
 }
 
 document.getElementById('draw-network').addEventListener('click', run);
-
-run();
